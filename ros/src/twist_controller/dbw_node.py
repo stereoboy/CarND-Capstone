@@ -54,11 +54,17 @@ class DBWNode(object):
                                          BrakeCmd, queue_size=1)
 
         # TODO: Create `TwistController` object
-        # self.controller = TwistController(<Arguments you wish to provide>)
+        self.controller = Controller()
 
         # TODO: Subscribe to all the topics you need to
+        self.dbw_status = False
+        rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_enabled_cb)
 
+        rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_cmd_cb)
+        self.twist_cmd = None
+        
         self.loop()
+
 
     def loop(self):
         rate = rospy.Rate(50) # 50Hz
@@ -70,8 +76,9 @@ class DBWNode(object):
             #                                                     <current linear velocity>,
             #                                                     <dbw status>,
             #                                                     <any other argument you need>)
-            # if <dbw is enabled>:
-            #   self.publish(throttle, brake, steer)
+            if self.twist_cmd and self.dbw_status:
+                throttle, brake, steering = self.controller.control(self.twist_cmd)
+                self.publish(throttle, brake, steer)
             rate.sleep()
 
     def publish(self, throttle, brake, steer):
@@ -91,6 +98,13 @@ class DBWNode(object):
         bcmd.pedal_cmd_type = BrakeCmd.CMD_TORQUE
         bcmd.pedal_cmd = brake
         self.brake_pub.publish(bcmd)
+
+    def dbw_enabled_cb(self, dbw_status):
+        rospy.loginfo("dbw_status is changed:{}".format(dbw_status))
+        self.dbw_status = dbw_status
+
+    def twist_cmd_cb(self, twist_cmd):
+        self.twist_cmd = twist_cmd
 
 
 if __name__ == '__main__':
