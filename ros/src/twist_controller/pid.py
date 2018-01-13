@@ -34,4 +34,8 @@ class PID(object):
             self.int_val = integral
         self.last_error = error
 
+        print(self.kp * error)
+        print(self.ki * self.int_val)
+        print(self.kd * derivative)
+        print(val)
         return val
