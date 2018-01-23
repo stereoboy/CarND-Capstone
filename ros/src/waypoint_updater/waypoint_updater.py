@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import rospy
+from std_msgs.msg import Int32
 from geometry_msgs.msg import PoseStamped
 from styx_msgs.msg import Lane, Waypoint
 
@@ -23,8 +24,24 @@ as well as to verify your TL classifier.
 TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
+# It will be up to you determine what the deceleration should be for the vehicle, and how this deceleration corresponds to waypoint target velocities. 
+# As in the Path Planning project, acceleration should not exceed 10 m/s^2 and jerk should not exceed 10 m/s^3.
+MAX_ACCEL   = 10 # m/s^2
+MAX_DEACCEL = 10 # m/s^2, this is a observed value after experiments in the simulator
+MAX_JERK    = 10 # m/s^3
+REF_SAFTY_MARGIN = 5
 LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
 UPDATE_FREQUENCY = 50 #FIXME
+BRAKING_DIST = 30
+BRAKING_SAFETY_MARGIN = 3
+BRAKING_DET_DIST = BRAKING_DIST + BRAKING_SAFETY_MARGIN
+
+# state
+STATE_STR = ["stop", "accel", "deaccel", "const_speed"]
+STATE_STOP = 0
+STATE_ACCEL = 1
+STATE_DEACCEL = 2
+STATE_CONST_SPEED = 3
 
 def closest_waypoint(current_pose, waypoints):
     dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
@@ -53,6 +70,98 @@ def next_waypoint_id(current_pose, waypoints):
 
     return closest_pt_id
 
+def distance(x1, y1, x2, y2):
+    return np.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1))
+
+# Transform from Cartesian x,y coordinates to Frenet s,d coordinates
+def getFrenet(pose, waypoints):
+    next_wp = next_waypoint_id(pose, waypoints);
+
+    prev_wp = next_wp - 1
+    if next_wp == 0:
+        prev_wp  = len(waypoints) - 1
+
+    n_x = waypoints[next_wp].pose.pose.position.x - waypoints[prev_wp].pose.pose.position.x
+    n_y = waypoints[next_wp].pose.pose.position.y - waypoints[prev_wp].pose.pose.position.y
+    x_x = pose.pose.position.x - waypoints[prev_wp].pose.pose.position.x
+    x_y = pose.pose.position.y - waypoints[prev_wp].pose.pose.position.y
+
+    # find the projection of x onto n
+    proj_norm = (x_x*n_x+x_y*n_y)/(n_x*n_x+n_y*n_y);
+    proj_x = proj_norm*n_x;
+    proj_y = proj_norm*n_y;
+
+    frenet_d = distance(x_x, x_y, proj_x, proj_y);
+
+    # see if d value is positive or negative by comparing it to a center point
+
+    center_x = 1000 - waypoints[prev_wp].pose.pose.position.x
+    center_y = 2000 - waypoints[prev_wp].pose.pose.position.y
+    centerToPos = distance(center_x, center_y, x_x, x_y);
+    centerToRef = distance(center_x, center_y, proj_x, proj_y);
+
+    if centerToPos <= centerToRef:
+       frenet_d *= -1;
+
+    # calculate s value
+    frenet_s = 0;
+    for i in range(prev_wp):
+        frenet_s += distance(   waypoints[i].pose.pose.position.x,
+                                waypoints[i].pose.pose.position.y,
+                                waypoints[i+1].pose.pose.position.x,
+                                waypoints[i+1].pose.pose.position.y);
+    frenet_s += distance(0, 0, proj_x, proj_y);
+
+    return frenet_s, frenet_d
+
+def convert_waypoints_to_frenetpoints(waypoints):
+    maps_s = [0.0]
+    frenet_s = 0;
+    for i in range(len(waypoints) - 1):
+        frenet_s += distance(   waypoints[i].pose.pose.position.x,
+                                waypoints[i].pose.pose.position.y,
+                                waypoints[i+1].pose.pose.position.x,
+                                waypoints[i+1].pose.pose.position.y);
+        maps_s.append(frenet_s)
+    return maps_s
+
+# Transform from Frenet s,d coordinates to Cartesian x,y
+def getXY(s, d, maps_s, waypoints):
+    prev_wp = -1;
+
+    while (s > maps_s[prev_wp+1] and (prev_wp < (len(maps_s) - 1) )):
+        prev_wp += 1
+
+    wp2 = (prev_wp+1)%len(waypoints)
+
+    heading = np.arctan2(   (waypoints[wp2].pose.pose.position.y - waypoints[prev_wp].pose.pose.position.y),
+                            (waypoints[wp2].pose.pose.position.x - waypoints[prev_wp].pose.pose.position.x))
+    # the x,y,s along the segment
+    seg_s = (s-maps_s[prev_wp])
+
+    seg_x = waypoints[prev_wp].pose.pose.position.x + seg_s*np.cos(heading)
+    seg_y = waypoints[prev_wp].pose.pose.position.y + seg_s*np.sin(heading)
+
+    perp_heading = heading-pi()/2;
+
+    x = seg_x + d*np.cos(perp_heading);
+    y = seg_y + d*np.sin(perp_heading);
+
+    return {x,y}
+
+def cal_vel_from_dist(dist, v0, accel):
+    def get_root(a, b, c):
+        if b*b - 4*a*c > 0:
+            return (-b + np.sqrt(b*b - 4*a*c))/(2*a)
+        else:
+            return (-b)/(2*a)
+
+
+    # dist = 0.5*accel*t^2 + v0*t
+    t = get_root(0.5*accel, v0, -dist)
+
+    return accel*t + v0
+
 class WaypointUpdater(object):
     def __init__(self):
         rospy.init_node('waypoint_updater')
@@ -61,21 +170,27 @@ class WaypointUpdater(object):
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
-        #rospy.Subscriber('/traffic_waypoint', 'TODO', self.traffic_cb)
+        rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
         #rospy.Subscriber('/obstacle_waypoint', 'TODO', self.obstacle_cb)
-
 
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
         # TODO: Add other member variables you need below
         self.base_waypoints = None
         self.current_pose = None
+        self.last_pose = None
+        self.traffic_waypoint = None
+        self.max_vel = rospy.get_param('/waypoint_loader/velocity')
+        self.last_vel = 0.0
+        #self.ref_vel = self.max_vel - REF_SAFTY_MARGIN
+        self.ref_vel = 11.0
+        self.ref_accel = 7.0
+        self.ref_deaccel = 5.0
+        self.state = STATE_STOP
 
         rate = rospy.Rate(UPDATE_FREQUENCY) # 50Hz
         while not rospy.is_shutdown():
             self.publish()
-            if self.base_waypoints is not None:
-                rospy.loginfo("waypoints: {}".format(len(self.base_waypoints.waypoints)))
             rate.sleep()
 
     def pose_cb(self, msg):
@@ -86,10 +201,11 @@ class WaypointUpdater(object):
     def waypoints_cb(self, waypoints):
         # TODO: Implement
         self.base_waypoints = waypoints
+        self.maps_s = convert_waypoints_to_frenetpoints(self.base_waypoints.waypoints)
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement
-        pass
+        self.traffic_waypoint = msg.data
 
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
@@ -111,15 +227,84 @@ class WaypointUpdater(object):
             wp1 = i
         return dist
 
+    def update_waypoints(self, waypoints, current_wp, target_vel, vel0=None, accel=None):
+        rospy.loginfo("state: {}".format(STATE_STR[self.state]))
+        rospy.loginfo("update_waypoints({}, {}, {}".format(target_vel, vel0, accel))
+        dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
+
+        if vel0 is not None and accel is not None:
+            initial_dist = dl(self.current_pose.pose.position, self.base_waypoints.waypoints[current_wp].pose.pose.position)
+            vel = vel0
+            for i in range(current_wp, current_wp + LOOKAHEAD_WPS):
+                dist = self.distance(waypoints, current_wp, i)
+                if vel != target_vel:
+                    vel = cal_vel_from_dist(initial_dist + dist, vel0, accel)
+                if accel >= 0 and vel >= target_vel:
+                    vel = target_vel
+                elif accel < 0 and vel <= target_vel:
+                    vel = target_vel
+
+                idx = i%len(self.base_waypoints.waypoints)
+                self.set_waypoint_velocity(waypoints, idx, vel)
+                rospy.loginfo("{}, {}".format(i, vel))
+        else:
+            for i in range(current_wp, current_wp + LOOKAHEAD_WPS):
+                idx = i%len(self.base_waypoints.waypoints)
+                self.set_waypoint_velocity(waypoints, idx, target_vel)
+
+
+    def update_state(self, current_wp):
+        dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
+
+        if current_wp > 0:
+            # FIXME
+            self.last_vel = self.base_waypoints.waypoints[(current_wp - 1)].twist.twist.linear.x
+
+        initial_dist = dl(self.current_pose.pose.position, self.base_waypoints.waypoints[current_wp].pose.pose.position)
+        rospy.loginfo("state: {}".format(STATE_STR[self.state]))
+        rospy.loginfo("current_waypoint: {}".format(current_wp))
+        rospy.loginfo("traffic_waypoint: {}".format(self.traffic_waypoint))
+        rospy.loginfo("last_vel: {}".format(self.last_vel))
+        if self.traffic_waypoint and self.traffic_waypoint is not -1:
+            dist_from_stopline = initial_dist + self.distance(self.base_waypoints.waypoints, current_wp, self.traffic_waypoint)
+            if self.state == STATE_CONST_SPEED or self.state == STATE_ACCEL:
+                max_dist_for_brake = 0.5*(self.last_vel*self.last_vel)/self.ref_deaccel + BRAKING_SAFETY_MARGIN
+                min_dist_for_brake = 0.5*(self.last_vel*self.last_vel)/MAX_DEACCEL + BRAKING_SAFETY_MARGIN
+                if dist_from_stopline < max_dist_for_brake and dist_from_stopline > min_dist_for_brake:
+                    self.state = STATE_DEACCEL
+
+                    deaccel = -0.5*(self.last_vel*self.last_vel)/(dist_from_stopline - BRAKING_SAFETY_MARGIN)
+                    self.update_waypoints(self.base_waypoints.waypoints, current_wp, 0.0, self.last_vel, deaccel)
+                else:
+                    rospy.loginfo("SKIPPPPPPPPPPPPPPPPPPPPPPPPPPPPP")
+                    rospy.loginfo("{}, {}, {}".format(dist_from_stopline, min_dist_for_brake, max_dist_for_brake))
+
+        elif self.state == STATE_ACCEL and self.last_vel == self.ref_vel:
+            self.state = STATE_CONST_SPEED
+            self.update_waypoints(self.base_waypoints.waypoints, current_wp, self.ref_vel)
+
+        elif self.state == STATE_STOP or self.state == STATE_DEACCEL:
+            self.state = STATE_ACCEL
+            self.update_waypoints(self.base_waypoints.waypoints, current_wp, self.ref_vel, self.last_vel, self.ref_accel)
+
+        elif self.state == STATE_DEACCEL and dl(self.last_pose.pose.position, self.current_pose.pose.position) == 0:
+            self.state = STATE_STOP
+
+        return
+
     def publish(self):
         if self.base_waypoints and self.current_pose:
             final_waypoints = Lane()
-            next_id = next_waypoint_id(self.current_pose, self.base_waypoints.waypoints)
+            current_wp = next_waypoint_id(self.current_pose, self.base_waypoints.waypoints)
+            # state management
+            self.update_state(current_wp)
             # TODO build final_waypoints
-            for i in range(LOOKAHEAD_WPS):
-                final_waypoints.waypoints.append(self.base_waypoints.waypoints[next_id + i])
+            for i in range(current_wp, current_wp + LOOKAHEAD_WPS):
+                idx = i%len(self.base_waypoints.waypoints)
+                final_waypoints.waypoints.append(self.base_waypoints.waypoints[idx])
             self.final_waypoints_pub.publish(final_waypoints)
 
+            self.last_pose = self.current_pose
 
 if __name__ == '__main__':
     try:
