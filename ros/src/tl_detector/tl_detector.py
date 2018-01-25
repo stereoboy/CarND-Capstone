@@ -14,7 +14,7 @@ import math
 
 STATE_COUNT_THRESHOLD = 3
 
-DETECTION_ID_DISTANCE = 100
+DETECTION_ID_DISTANCE = 200
 
 
 def get_closest_light_from_stop_line(stop_line_position, lights):
@@ -87,6 +87,7 @@ class TLDetector(object):
         rate = rospy.Rate(UPDATE_FREQUENCY) # 50Hz
         while not rospy.is_shutdown():
             light_wp, state = self.process_traffic_lights()
+            light_wp = light_wp if state == TrafficLight.RED else -1
             self.upcoming_red_light_pub.publish(Int32(light_wp))
             rate.sleep()
 
@@ -168,7 +169,7 @@ class TLDetector(object):
         # search the nearest_stop_line
         nearest_stop_line_waypoint = 0
         for i, stop_line_waypoint in enumerate(self.stop_line_waypoints):
-            if position < stop_line_waypoint:
+            if position < stop_line_waypoint: #FIXME
                 nearest_stop_line_waypoint = i
                 break
         return nearest_stop_line_waypoint, self.stop_line_waypoints[nearest_stop_line_waypoint]
@@ -213,16 +214,16 @@ class TLDetector(object):
 
         if(self.pose and self.lights):
             stop_line_id, stop_line_wp = self.get_nearest_stop_line(car_position, stop_line_positions)
-            print(self.pose.pose.position)
-            print(stop_line_positions)
-            print(car_position, stop_line_id, stop_line_wp)
+#            print(self.pose.pose.position)
+#            print(stop_line_positions)
+#            print(car_position, stop_line_id, stop_line_wp)
             if stop_line_id is not -1:
                 if (stop_line_wp - car_position) < DETECTION_ID_DISTANCE:
                     light = self.lights[stop_line_id]
-                    print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+                    #print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
                 if (stop_line_wp - car_position) < (-len(self.waypoints.waypoints) + DETECTION_ID_DISTANCE):
                     light = self.lights[stop_line_id]
-                    print("DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD")
+                    #print("DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD")
 
         if light:
             state = self.get_light_state(light)
