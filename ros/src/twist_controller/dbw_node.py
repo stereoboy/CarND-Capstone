@@ -98,7 +98,7 @@ class DBWNode(object):
             #                                                     <any other argument you need>)
             if self.twist_cmd and self.dbw_status:
                 self.current_stamp = rospy.get_time()
-                throttle, brake, steering = self.controller.control(self.linear_velocity, self.angular_velocity, self.current_velocity, self.current_stamp, self.dbw_status)
+                throttle, brake, steering = self.controller.control(self.linear_velocity, self.angular_velocity, self.current_linear_velocity, self.current_angular_velocity, self.current_stamp, self.dbw_status)
                 if throttle == 0.0 and brake == 0.0:
                     pass # Do Nothing!!! final throttle values to the simulator are stochastic, not deterministic.
                 else:
@@ -136,8 +136,9 @@ class DBWNode(object):
         self.angular_velocity = twist_cmd.twist.angular.z
 
     def current_velocity_cb(self, twist_msg):
-        self.current_velocity = twist_msg.twist.linear.x
-        #rospy.loginfo("current_velocity is updated")
+        self.current_linear_velocity = twist_msg.twist.linear.x
+        self.current_angular_velocity = twist_msg.twist.angular.z
+        #rospy.loginfo("current_linear_velocity is updated")
 
 
 if __name__ == '__main__':
