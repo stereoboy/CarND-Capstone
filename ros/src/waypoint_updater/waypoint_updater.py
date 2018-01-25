@@ -25,12 +25,13 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
 EPS=1e-3
+KMPH_TO_MPS = 0.277778
 # It will be up to you determine what the deceleration should be for the vehicle, and how this deceleration corresponds to waypoint target velocities. 
 # As in the Path Planning project, acceleration should not exceed 10 m/s^2 and jerk should not exceed 10 m/s^3.
 MAX_ACCEL   = 10 # m/s^2
-MAX_DEACCEL = 10 # m/s^2, this is a observed value after experiments in the simulator
+MAX_DEACCEL =  8 # m/s^2, this is a observed value after experiments in the simulator
 MAX_JERK    = 10 # m/s^3
-REF_SAFTY_MARGIN = 5
+REF_VEL_RATIO_TO_MAX = 0.95
 LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
 UPDATE_FREQUENCY = 50 #FIXME
 BRAKING_SAFETY_MARGIN = 5
@@ -179,11 +180,9 @@ class WaypointUpdater(object):
         self.current_pose = None
         self.last_pose = None
         self.traffic_waypoint = None
-        self.max_vel = rospy.get_param('/waypoint_loader/velocity')
+        self.max_vel = KMPH_TO_MPS*rospy.get_param('/waypoint_loader/velocity')
         self.last_vel = 0.0
-        #self.ref_vel = self.max_vel - REF_SAFTY_MARGIN
-        #self.ref_vel = 11.0
-        self.ref_vel = 30
+        self.ref_vel = self.max_vel*REF_VEL_RATIO_TO_MAX
         self.ref_accel = 4.0
         self.ref_decel = 4.0
         self.state = STATE_STOP
