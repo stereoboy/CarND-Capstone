@@ -33,7 +33,7 @@ that we have created in the `__init__` function.
 
 class DBWNode(object):
     def __init__(self):
-        rospy.init_node('dbw_node')
+        rospy.init_node('dbw_node', log_level=rospy.INFO)
 
         vehicle_mass = rospy.get_param('~vehicle_mass', 1736.35)
         fuel_capacity = rospy.get_param('~fuel_capacity', 13.5)
@@ -125,7 +125,7 @@ class DBWNode(object):
         self.brake_pub.publish(bcmd)
 
     def dbw_enabled_cb(self, dbw_status):
-        rospy.loginfo("dbw_status is changed:{}".format(dbw_status))
+        rospy.logdebug("dbw_status is changed:{}".format(dbw_status))
         self.dbw_status = dbw_status
         if self.dbw_status is True:
             # reset
@@ -138,7 +138,6 @@ class DBWNode(object):
     def current_velocity_cb(self, twist_msg):
         self.current_linear_velocity = twist_msg.twist.linear.x
         self.current_angular_velocity = twist_msg.twist.angular.z
-        #rospy.loginfo("current_linear_velocity is updated")
 
 
 if __name__ == '__main__':
