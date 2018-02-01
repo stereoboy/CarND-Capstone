@@ -34,5 +34,5 @@ class PID(object):
             self.int_val = integral
         self.last_error = error
 
-        rospy.loginfo("PID: {} + {} + {} = {}".format(self.kp * error, self.ki * self.int_val, self.kd * derivative, val))
+        rospy.logdebug(">>PID: {} + {} + {} = {}".format(self.kp * error, self.ki * self.int_val, self.kd * derivative, val))
         return val

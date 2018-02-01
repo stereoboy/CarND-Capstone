@@ -41,36 +41,36 @@ class Controller(object):
         else:
             sample_time = (current_stamp - self.last_stamp)
         self.last_stamp = current_stamp
-        rospy.loginfo("error: {} - {} = {}".format(linear_velocity, current_linear_velocity, linear_velocity - current_linear_velocity))
-        rospy.loginfo("sample_time: {}".format(sample_time))
+        rospy.logdebug("error: {} - {} = {}".format(linear_velocity, current_linear_velocity, linear_velocity - current_linear_velocity))
+        rospy.logdebug("sample_time: {}".format(sample_time))
 
         error = linear_velocity - current_linear_velocity
+        rospy.logdebug("PID for throttling")
         accel = self.throttle_ctrl.step(error, sample_time)
-        rospy.loginfo("before lowpassfilter: {}".format(accel))
+        #rospy.logdebug("before lowpassfilter: {}".format(accel))
         accel = self.lowpass_filter.filt(accel)
-        rospy.loginfo("after lowpassfilter: {}".format(accel))
+        #rospy.logdebug("after lowpassfilter: {}".format(accel))
 
         if accel > 0.0:
             throttle = accel
             if linear_velocity == 0.0:
                 throttle = 0.0
             brake = 0.0
-            rospy.loginfo("throttle: {}".format(throttle))
+            rospy.logdebug("throttle: {}".format(throttle))
         else:
             if accel < -self.brake_deadband:
                 brake = (self.vehicle_mass + self.fuel_capacity*GAS_DENSITY)*abs(accel)*self.wheel_radius
             else:
                 brake = 0.0
             throttle = 0.0
-            rospy.loginfo("brake: {}".format(brake))
+            rospy.logdebug("brake: {}".format(brake))
 
             # Heuristic. if we need decel curve, we need to igore integral value of PID.
             self.reset_throttle_ctrl()
 
-        rospy.loginfo("\t\t\t\t\t\t\t\t\t(throttle, brake): {}\t\t\t{}".format(throttle, brake))
+        rospy.logdebug("\t\t\t\t\t\t\t\t\t(throttle, brake): {}\t\t\t{}".format(throttle, brake))
         steer = self.yaw_ctrl.get_steering(linear_velocity, angular_velocity, current_linear_velocity)
-        print("############################################")
         angular_error = current_angular_velocity = angular_velocity
+        rospy.logdebug("PID for steering")
         steer = steer + self.yaw_adjust_ctrl.step(angular_error, sample_time)
-        print("############################################")
         return throttle, brake, steer
