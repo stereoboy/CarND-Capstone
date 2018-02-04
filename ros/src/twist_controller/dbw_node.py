@@ -33,7 +33,7 @@ that we have created in the `__init__` function.
 
 class DBWNode(object):
     def __init__(self):
-        rospy.init_node('dbw_node')
+        rospy.init_node('dbw_node', log_level=rospy.INFO)
 
         vehicle_mass = rospy.get_param('~vehicle_mass', 1736.35)
         fuel_capacity = rospy.get_param('~fuel_capacity', 13.5)
@@ -66,10 +66,7 @@ class DBWNode(object):
         self.max_lat_accel  = max_lat_accel
         self.max_steer_angle = max_steer_angle
 
-        self.controller = Controller(self.vehicle_mass, self.fuel_capacity,
-                                        self.brake_deadband, self.decel_limit, self.accel_limit,
-                                        self.wheel_radius, self.wheel_base, self.steer_ratio,
-                                        self.min_speed, self.max_lat_accel, self.max_steer_angle)
+        self.reset_controller()
 
         # TODO: Subscribe to all the topics you need to
         self.dbw_status = False
@@ -81,6 +78,12 @@ class DBWNode(object):
         rospy.Subscriber('/current_velocity',TwistStamped, self.current_velocity_cb)
 
         self.loop()
+
+    def reset_controller(self):
+        self.controller = Controller(self.vehicle_mass, self.fuel_capacity,
+                                        self.brake_deadband, self.decel_limit, self.accel_limit,
+                                        self.wheel_radius, self.wheel_base, self.steer_ratio,
+                                        self.min_speed, self.max_lat_accel, self.max_steer_angle)
 
 
     def loop(self):
@@ -95,8 +98,11 @@ class DBWNode(object):
             #                                                     <any other argument you need>)
             if self.twist_cmd and self.dbw_status:
                 self.current_stamp = rospy.get_time()
-                throttle, brake, steering = self.controller.control(self.linear_velocity, self.angular_velocity, self.current_velocity, self.current_stamp, self.dbw_status)
-                self.publish(throttle, brake, steering)
+                throttle, brake, steering = self.controller.control(self.linear_velocity, self.angular_velocity, self.current_linear_velocity, self.current_angular_velocity, self.current_stamp, self.dbw_status)
+                if throttle == 0.0 and brake == 0.0:
+                    pass # Do Nothing!!! final throttle values to the simulator are stochastic, not deterministic.
+                else:
+                    self.publish(throttle, brake, steering)
             rate.sleep()
 
     def publish(self, throttle, brake, steer):
@@ -119,23 +125,19 @@ class DBWNode(object):
         self.brake_pub.publish(bcmd)
 
     def dbw_enabled_cb(self, dbw_status):
-        rospy.loginfo("dbw_status is changed:{}".format(dbw_status))
+        rospy.logdebug("dbw_status is changed:{}".format(dbw_status))
         self.dbw_status = dbw_status
         if self.dbw_status is True:
             # reset
-            self.controller = Controller(self.vehicle_mass, self.fuel_capacity,
-                                        self.brake_deadband, self.decel_limit, self.accel_limit,
-                                        self.wheel_radius, self.wheel_base, self.steer_ratio,
-                                        self.min_speed, self.max_lat_accel, self.max_steer_angle)
-
+            self.reset_controller()
     def twist_cmd_cb(self, twist_cmd):
         self.twist_cmd = twist_cmd
         self.linear_velocity = twist_cmd.twist.linear.x
         self.angular_velocity = twist_cmd.twist.angular.z
 
     def current_velocity_cb(self, twist_msg):
-        self.current_velocity = twist_msg.twist.linear.x
-        rospy.loginfo("current_velocity is updated")
+        self.current_linear_velocity = twist_msg.twist.linear.x
+        self.current_angular_velocity = twist_msg.twist.angular.z
 
 
 if __name__ == '__main__':

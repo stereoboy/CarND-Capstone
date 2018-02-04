@@ -1,4 +1,4 @@
-
+import rospy
 MIN_NUM = float('-inf')
 MAX_NUM = float('inf')
 
@@ -34,8 +34,5 @@ class PID(object):
             self.int_val = integral
         self.last_error = error
 
-        print(self.kp * error)
-        print(self.ki * self.int_val)
-        print(self.kd * derivative)
-        print(val)
+        rospy.logdebug(">>PID: {} + {} + {} = {}".format(self.kp * error, self.ki * self.int_val, self.kd * derivative, val))
         return val
