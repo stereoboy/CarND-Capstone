@@ -229,14 +229,18 @@ class WaypointUpdater(object):
                 else:
                     rospy.logdebug("a red light is detected but we can not stop with the maximum decel.")
                     rospy.logdebug("{}, {}, {}".format(dist_from_stopline, min_dist_for_brake, max_dist_for_brake))
+        elif self.traffic_waypoint == None:
+            # do nothing, stay
+            pass
 
-        elif self.state == STATE_ACCEL and self.last_vel == self.ref_vel:
-            self.state = STATE_CONST_SPEED
-            self.update_waypoints(self.base_waypoints.waypoints, self.current_pose, current_wp, self.ref_vel)
+        else: # self.traffic_waypoint == -1
+            if self.state == STATE_ACCEL and self.last_vel == self.ref_vel: 
+                self.state = STATE_CONST_SPEED
+                self.update_waypoints(self.base_waypoints.waypoints, self.current_pose, current_wp, self.ref_vel)
 
-        elif self.state == STATE_STOP or self.state == STATE_DECEL:
-            self.state = STATE_ACCEL
-            self.update_waypoints(self.base_waypoints.waypoints, self.current_pose, current_wp, self.ref_vel, self.last_vel, self.ref_accel)
+            elif self.state == STATE_STOP or self.state == STATE_DECEL:
+                self.state = STATE_ACCEL
+                self.update_waypoints(self.base_waypoints.waypoints, self.current_pose, current_wp, self.ref_vel, self.last_vel, self.ref_accel)
 
 
         if self.state == STATE_CONST_SPEED:
