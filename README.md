@@ -1,7 +1,8 @@
 
 [image1]: ./final-project-ros-graph-v2.png
 [image2]: ./RetinaNet.png
-[image3]: ./PathPlanning.png
+[image3]: ./TrafficLightDetection.png
+[image4]: ./PathPlanning.png
 
 # Team BTS
 
@@ -56,18 +57,23 @@ $ pip install keras==2.1.3
 
 ## Traffic Light Detection
 ### Main Detection Algorithm: **RetinaNet**
+* We applied one of the latest and high performance object detection algorithm, **RetinaNet**
+  ![alt text][image2]
 
-![alt text][image2]
+* Implementation is [Here: Keras-RetinaNet Git Repository](https://github.com/dmitrykudinov/keras-retinanet/)
+* Sample Result
+  ![alt text][image3]
 
-* Original Paper
-  * [Focal Loss for Dense Object Detection](https://arxiv.org/abs/1708.02002)
-* Reference Source Code
-  * [Keras RetinaNet](https://github.com/fizyr/keras-retinanet)
+* References
+  * Original Paper
+    * [Focal Loss for Dense Object Detection](https://arxiv.org/abs/1708.02002)
+  * Reference Source Code
+    * [Keras RetinaNet](https://github.com/fizyr/keras-retinanet)
 
 ## Path Planning
 
 * Simplified Linear Accel/Decel
-![alt text][image3]
+![alt text][image4]
 
 ## Control
 
