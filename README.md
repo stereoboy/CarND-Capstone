@@ -1,74 +1,87 @@
-This is the project repo for the final project of the Udacity Self-Driving Car Nanodegree: Programming a Real Self-Driving Car. For more information about the project, see the project introduction [here](https://classroom.udacity.com/nanodegrees/nd013/parts/6047fe34-d93c-4f50-8336-b70ef10cb4b2/modules/e1a23b06-329a-4684-a717-ad476f0d8dff/lessons/462c933d-9f24-42d3-8bdc-a08a5fc866e4/concepts/5ab4b122-83e6-436d-850f-9f4d26627fd9).
 
-Please use **one** of the two installation options, either native **or** docker installation.
+[image1]: ./final-project-ros-graph-v2.png
+[image2]: ./RetinaNet.png
+[image3]: ./TrafficLightDetection.png
+[image4]: ./PathPlanning.png
 
-### Native Installation
+# Team BTS
 
-* Be sure that your workstation is running Ubuntu 16.04 Xenial Xerus or Ubuntu 14.04 Trusty Tahir. [Ubuntu downloads can be found here](https://www.ubuntu.com/download/desktop).
-* If using a Virtual Machine to install Ubuntu, use the following configuration as minimum:
-  * 2 CPU
-  * 2 GB system memory
-  * 25 GB of free hard drive space
+## Sample Video
+[![alt text](https://img.youtube.com/vi/-qO-iFIxGf0/0.jpg)](https://youtu.be/-qO-iFIxGf0)
 
-  The Udacity provided virtual machine has ROS and Dataspeed DBW already installed, so you can skip the next two steps if you are using this.
+## Team Members
+| Name                    | Email                     | Slack ID    | Role |
+| :--                     | :--                       | :--         |:--     |
+| Jaeyoung Lee (Lead)     | jylee0121@gmail.com       | @stormboy   | Path Planning / Control |
+| Toshiya Matsuda         | tmresolution59@gmail.com  | @t-matsuda  | Traffic Light Detection Data  |
+| Dmitry Kudinov          | d.kudinov@gmail.com       | @dkudinov   | Traffic Light Detection Algorithm |
+| Zeyu Zhang              | hellozeyu@gmail.com       | @hellozeyu  | System Integration |
 
-* Follow these instructions to install ROS
-  * [ROS Kinetic](http://wiki.ros.org/kinetic/Installation/Ubuntu) if you have Ubuntu 16.04.
-  * [ROS Indigo](http://wiki.ros.org/indigo/Installation/Ubuntu) if you have Ubuntu 14.04.
-* [Dataspeed DBW](https://bitbucket.org/DataspeedInc/dbw_mkz_ros)
-  * Use this option to install the SDK on a workstation that already has ROS installed: [One Line SDK Install (binary)](https://bitbucket.org/DataspeedInc/dbw_mkz_ros/src/81e63fcc335d7b64139d7482017d6a97b405e250/ROS_SETUP.md?fileviewer=file-view-default)
-* Download the [Udacity Simulator](https://github.com/udacity/CarND-Capstone/releases).
+## Install Guide
 
-### Docker Installation
-[Install Docker](https://docs.docker.com/engine/installation/)
+1. Clone git with option `--recursive`
+```
+$ git clone --recursive <this repository url>
+```
+2. Install Keras 2.1.3
+```
+$ pip install keras==2.1.3
+```
+3. [Download the trained model `d00_9_csv_34.h5` here](https://www.dropbox.com/s/xpifcgnw0lcd5ce/d00_9_csv_34.h5?dl=0)
+  * Move this file into `keras-retinanet/snapshots`
 
-Build the docker container
-```bash
-docker build . -t capstone
+## System Overview
+
+![alt text][image1]
+
+### Directory Summary
+```
+.
+├── data
+├── imgs
+├── keras-retinanet         // <-- added for Traffic Light Detection
+│   ├── examples
+│   ├── images
+│   ├── keras_resnet
+│   ├── keras_retinanet
+│   ├── snapshots
+│   └── tests
+├── linux_sim
+│   └── linux_sys_int
+└── ros
+    ├── build
+        ├── devel
+            ├── launch
+                └── src
 ```
 
-Run the docker file
-```bash
-docker run -p 4567:4567 -v $PWD:/capstone -v /tmp/log:/root/.ros/ --rm -it capstone
-```
+## Traffic Light Detection
+### Main Detection Algorithm: **RetinaNet**
+* We applied one of the latest and high performance object detection algorithm, **RetinaNet**
+  ![alt text][image2]
 
-### Port Forwarding
-To set up port forwarding, please refer to the [instructions from term 2](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/0949fca6-b379-42af-a919-ee50aa304e6a/lessons/f758c44c-5e40-4e01-93b5-1a82aa4e044f/concepts/16cf4a78-4fc7-49e1-8621-3450ca938b77)
+* Implementation is [Here: Keras-RetinaNet Git Repository](https://github.com/dmitrykudinov/keras-retinanet/)
+* Sample Result
+  ![alt text][image3]
 
-### Usage
+* References
+  * Original Paper
+    * [Focal Loss for Dense Object Detection](https://arxiv.org/abs/1708.02002)
+  * Reference Source Code
+    * [Keras RetinaNet](https://github.com/fizyr/keras-retinanet)
 
-1. Clone the project repository
-```bash
-git clone https://github.com/udacity/CarND-Capstone.git
-```
+## Path Planning
 
-2. Install python dependencies
-```bash
-cd CarND-Capstone
-pip install -r requirements.txt
-```
-3. Make and run styx
-```bash
-cd ros
-catkin_make
-source devel/setup.sh
-roslaunch launch/styx.launch
-```
-4. Run the simulator
+* Simplified Linear Accel/Decel
+![alt text][image4]
 
-### Real world testing
-1. Download [training bag](https://drive.google.com/file/d/0B2_h37bMVw3iYkdJTlRSUlJIamM/view?usp=sharing) that was recorded on the Udacity self-driving car (a bag demonstraing the correct predictions in autonomous mode can be found [here](https://drive.google.com/open?id=0B2_h37bMVw3iT0ZEdlF4N01QbHc))
-2. Unzip the file
-```bash
-unzip traffic_light_bag_files.zip
-```
-3. Play the bag file
-```bash
-rosbag play -l traffic_light_bag_files/loop_with_traffic_light.bag
-```
-4. Launch your project in site mode
-```bash
-cd CarND-Capstone/ros
-roslaunch launch/site.launch
-```
-5. Confirm that traffic light detection works on real life images
+## Control
+
+* Manually Tuned PID Control for both of Steering and Throttling.
+
+| Type           | K_P  | K_I     | K_D |
+| :--            | :--  | :--     |:--  |
+| Throttling     | 0.3  | 0.005   | 0.1 |
+| Steering       | 0.7  | 0.0     | 0.1 |
+
+
